@@ -4,6 +4,8 @@
 
 Проект спроектирован для сохранения семантики, структуры и разметки (формулы, таблицы, ссылки, код) при локальном переводе сложных текстов.
 
+![иллюстрация](docs/img/logo.png)
+
 ## Почему `scisdvig`?
 
 Название образовано от **sci** (*science*) и **sdvig** (*translation shift*):
@@ -16,17 +18,22 @@
 ## Структура репозитория
 
 ```tree
-|- README.md
-|- CONTRIBUTING.md
-|- docs/
-|   |- requirements.md
-|   |- architecture.md
-|   |- backlog.md
-|   |- features/
-|       |- F-001-translate-document.md
-|   | adr/
-|   |   |- 0001-....md
-|- src/
-|- tests/
-|    | fixtures/
+├── CONTRIBUTING.md
+├── LICENSE
+├── README.md
+├── backlog.md
+└── docs
+    ├── architecture.md
+    ├── backlog.md
+    ├── img/
+    ├── requirements/
+    │   ├── README.md
+    │   ├── business.md
+    │   ├── constraints.md
+    │   ├── functional.md
+    │   ├── llm-usage-accounting.md
+    │   ├── non-functional.md
+    │   ├── technical-stories.md
+    │   └── user.md
+    └── template_req.md
 ```
