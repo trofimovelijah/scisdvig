@@ -20,6 +20,8 @@
 ```tree
 ├── backlog.md
 ├── CONTRIBUTING.md
+├── depositary
+│   └── README.md
 ├── docs
 │   ├── architecture.md
 │   ├── backlog.md
