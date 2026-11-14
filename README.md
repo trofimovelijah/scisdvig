@@ -18,22 +18,16 @@
 ## Структура репозитория
 
 ```tree
+├── backlog.md
 ├── CONTRIBUTING.md
+├── docs
+│   ├── architecture.md
+│   ├── backlog.md
+│   ├── diagrams
+│   ├── img
+│   ├── requirements
+│   └── template_req.md
 ├── LICENSE
 ├── README.md
-├── backlog.md
-└── docs
-    ├── architecture.md
-    ├── backlog.md
-    ├── img/
-    ├── requirements/
-    │   ├── README.md
-    │   ├── business.md
-    │   ├── constraints.md
-    │   ├── functional.md
-    │   ├── llm-usage-accounting.md
-    │   ├── non-functional.md
-    │   ├── technical-stories.md
-    │   └── user.md
-    └── template_req.md
+└── src
 ```
