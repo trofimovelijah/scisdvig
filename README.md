@@ -18,18 +18,19 @@
 ## Структура репозитория
 
 ```tree
-├── backlog.md
 ├── CONTRIBUTING.md
-├── depositary
-│   └── README.md
-├── docs
-│   ├── architecture.md
-│   ├── backlog.md
-│   ├── diagrams
-│   ├── img
-│   ├── requirements
-│   └── template_req.md
 ├── LICENSE
 ├── README.md
-└── src
+├── backlog.md                  # приоритет, итерация, состояние, ссылки
+├── depositary/                 # хранилище файлов-переводов
+├── docs
+│   ├── adr/                    # почему выбран реализуемый вариант
+│   ├── architecture.md         # текущая архитектура, границы, данные, состояния и ошибки
+│   ├── backlog.md              # планирование работ, связанных с ADR
+│   ├── diagrams/
+│   ├── img/
+│   ├── requirements/           # требования
+│   ├── runbook.md              # реальная подготовка среды, запуск, остановка и диагностика
+│   └── template_req.md
+└── src/                        # исходный код приложения
 ```
