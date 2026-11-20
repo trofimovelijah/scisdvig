@@ -118,26 +118,26 @@ EOF
 
 | Модель пользователя | Точный исходный ID / выбранный артефакт | Выбранный маршрут | Другие варианты / особенности |
 |---|---|---|---|
-| translategemma-12b-it-8bit | `mlx-community/translategemma-12b-it-8bit` ← `google/translategemma-12b-it` | MLX, §3 | Ollama 12b — другой артефакт; не считать его теми же 8-bit весами. [web:74][web:70] |
-| translategemma-4b-it-4bit | `mlx-community/translategemma-4b-it-4bit` | MLX, §3 | Быстрый предпросмотр — предполагаемая роль, скорость проверить локально. [web:64] |
-| translateGemma-27B-it | `google/translategemma-27b-it`; выбран `mlx-community/translategemma-27b-it-4bit` | MLX 4-bit, §3 | Ollama `translategemma:27b`; BF16 не брать стартовым вариантом. [web:13][web:65][web:70] |
-| Index-Translate-2B | `IndexTeam/Index-Translate-2B-GGUF` | llama.cpp Q8_0, §4 | Официальный GGUF; Ollama — альтернатива. [web:66] |
-| Index-Translate-9B | `IndexTeam/Index-Translate-9B-GGUF` | llama.cpp Q8_0, §4 | Q4_K_M — более компактная альтернатива. [web:7] |
-| Hunyuan-MT-7B | `tencent/Hunyuan-MT-7B`; `DevQuasar/tencent.Hunyuan-MT-7B-GGUF` | llama.cpp, §5 | Есть MLX `mlx-community/Hunyuan-MT-7B-8bit`, но общий рецепт ниже использует GGUF. Не заменять на HY-MT1.5 / Hy-MT2. [web:109][web:110] |
-| Hunyuan-MT-Chimera-7B | `tencent/Hunyuan-MT-Chimera-7B`; `KnutJaegersberg/Hunyuan-MT-Chimera-7B-Q8_0-GGUF` | llama.cpp Q8_0, §5 | Это синтез нескольких переводов, а не обычный первый переводчик. [web:33][web:114] |
-| MADLAD400-3B | Здесь принят переводческий checkpoint `google/madlad400-3b-mt` | llama.cpp T5 GGUF, §8 | Transformers CPU — резерв. Старые Candle GGUF нельзя механически передавать llama.cpp. [web:67][web:95][web:100] |
-| OPUS-MT EN→RU | Здесь принят `Helsinki-NLP/opus-mt-en-ru` | Transformers CPU, §9 | Marian encoder-decoder; готовый подтверждённый путь в тройке MLX/llama.cpp/Ollama не выбран. [web:69] |
-| M2M100-418M | `facebook/m2m100_418M` | Transformers CPU, §9 | Отдельные source language и forced target language; не чат. [web:68] |
-| TowerInstruct-7B-v0.2 | `Unbabel/TowerInstruct-7B-v0.2` | Конвертация в MLX 8-bit, §6 | Llama-архитектура, но ChatML-шаблон; нельзя подменять v0.1. [web:50][web:60] |
-| Qwen3-30B-A3B-Instruct-2507 | `Qwen/Qwen3-30B-A3B-Instruct-2507`; GGUF от bartowski | llama.cpp Q4_K_M, §7 | MLX-конверсия также существует; базовый `qwen3:30b` не использовать как синоним 2507. [web:75][web:83][web:84] |
+| translategemma-12b-it-8bit | `mlx-community/translategemma-12b-it-8bit` ← `google/translategemma-12b-it` | MLX, §3 | Ollama 12b — другой артефакт; не считать его теми же 8-bit весами. |
+| translategemma-4b-it-4bit | `mlx-community/translategemma-4b-it-4bit` | MLX, §3 | Быстрый предпросмотр — предполагаемая роль, скорость проверить локально. |
+| translateGemma-27B-it | `google/translategemma-27b-it`; выбран `mlx-community/translategemma-27b-it-4bit` | MLX 4-bit, §3 | Ollama `translategemma:27b`; BF16 не брать стартовым вариантом. |
+| Index-Translate-2B | `IndexTeam/Index-Translate-2B-GGUF` | llama.cpp Q8_0, §4 | Официальный GGUF; Ollama — альтернатива. |
+| Index-Translate-9B | `IndexTeam/Index-Translate-9B-GGUF` | llama.cpp Q8_0, §4 | Q4_K_M — более компактная альтернатива. |
+| Hunyuan-MT-7B | `tencent/Hunyuan-MT-7B`; `DevQuasar/tencent.Hunyuan-MT-7B-GGUF` | llama.cpp, §5 | Есть MLX `mlx-community/Hunyuan-MT-7B-8bit`, но общий рецепт ниже использует GGUF. Не заменять на HY-MT1.5 / Hy-MT2. |
+| Hunyuan-MT-Chimera-7B | `tencent/Hunyuan-MT-Chimera-7B`; `KnutJaegersberg/Hunyuan-MT-Chimera-7B-Q8_0-GGUF` | llama.cpp Q8_0, §5 | Это синтез нескольких переводов, а не обычный первый переводчик. |
+| MADLAD400-3B | Здесь принят переводческий checkpoint `google/madlad400-3b-mt` | llama.cpp T5 GGUF, §8 | Transformers CPU — резерв. Старые Candle GGUF нельзя механически передавать llama.cpp. |
+| OPUS-MT EN→RU | Здесь принят `Helsinki-NLP/opus-mt-en-ru` | Transformers CPU, §9 | Marian encoder-decoder; готовый подтверждённый путь в тройке MLX/llama.cpp/Ollama не выбран. |
+| M2M100-418M | `facebook/m2m100_418M` | Transformers CPU, §9 | Отдельные source language и forced target language; не чат. |
+| TowerInstruct-7B-v0.2 | `Unbabel/TowerInstruct-7B-v0.2` | Конвертация в MLX 8-bit, §6 | Llama-архитектура, но ChatML-шаблон; нельзя подменять v0.1. |
+| Qwen3-30B-A3B-Instruct-2507 | `Qwen/Qwen3-30B-A3B-Instruct-2507`; GGUF от bartowski | llama.cpp Q4_K_M, §7 | MLX-конверсия также существует; базовый `qwen3:30b` не использовать как синоним 2507. |
 
 Если условие «только MLX, llama.cpp, Ollama» абсолютно жёсткое, OPUS-MT и M2M100 следует пометить `BLOCKED_RUNTIME`, а §9 не выполнять. Наличие 64 GB RAM не устраняет несовместимость загрузчика и архитектуры.
 
-## 3. TranslateGemma: один скрипт для трёх размеров
+## TranslateGemma: один скрипт для трёх размеров
 
-### 3.1. Важный контракт запроса
+### Важный контракт запроса
 
-Использовать специальный шаблон Google: `content` — список из одного объекта с `type`, `source_lang_code`, `target_lang_code`, `text`. Не добавлять system message. Автоматически показанный в некоторых карточках пример «Write a story about Einstein» не соответствует документированному контракту перевода. Официальная карточка указывает общий входной контекст 2K токенов; указанное у Ollama архитектурное окно 128K не доказывает качество перевода на 128K. [web:32][web:70]
+Использовать специальный шаблон Google: `content` — список из одного объекта с `type`, `source_lang_code`, `target_lang_code`, `text`. Не добавлять `system message`. Автоматически показанный в некоторых карточках пример «Write a story about Einstein» не соответствует документированному контракту перевода. Официальная карточка указывает общий входной контекст 2K токенов; указанное у Ollama архитектурное окно 128K не доказывает качество перевода на 128K.
 
 Создать `scripts/translate_mlx.py`:
 
@@ -178,7 +178,7 @@ Path(a.output).write_text(answer + '\n', encoding='utf-8')
 print(answer)
 ```
 
-Порог 1800 — консервативный локальный барьер для входа, не новый заявленный лимит модели. Размер ответа задаётся отдельно. API `load`/`generate` и greedy sampler поддерживаются MLX LM. [web:34][web:36]
+Порог 1800 — консервативный локальный барьер для входа, не новый заявленный лимит модели. Размер ответа задаётся отдельно. API `load`/`generate` и greedy sampler поддерживаются MLX LM. 
 
 Запускать последовательно:
 
