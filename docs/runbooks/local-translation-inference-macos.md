@@ -14,20 +14,26 @@
     - [Важный формат запроса](#важный-формат-запроса)
     - [Скрипт первого перевода](#скрипт-первого-перевода)
     - [Выполнить запуск каждой модели отдельно](#выполнить-запуск-каждой-модели-отдельно)
-  - [4. Группа B: GGUF через llama.cpp](#4-группа-b-gguf-через-llamacpp)
-    - [4.1. Запуск сервера: выбрать ОДНУ команду](#41-запуск-сервера-выбрать-одну-команду)
-    - [4.2. Единый клиент с модельно-зависимыми шаблонами](#42-единый-клиент-с-модельно-зависимыми-шаблонами)
-    - [4.3. Первые запросы](#43-первые-запросы)
-    - [4.4. Отдельный сценарий Chimera](#44-отдельный-сценарий-chimera)
-  - [5. Альтернатива: Ollama](#5-альтернатива-ollama)
-    - [5.1. GGUF из HF](#51-gguf-из-hf)
-    - [5.2. TranslateGemma в каталоге Ollama](#52-translategemma-в-каталоге-ollama)
-    - [5.3. Если модель уже скачана как локальный GGUF](#53-если-модель-уже-скачана-как-локальный-gguf)
-  - [6. Группа C: encoder-decoder — отдельное исключение](#6-группа-c-encoder-decoder--отдельное-исключение)
-    - [6.1. Почему это исключение](#61-почему-это-исключение)
-    - [6.2. Отдельное окружение](#62-отдельное-окружение)
-    - [6.3. Скрипт для трёх моделей](#63-скрипт-для-трёх-моделей)
-    - [6.4. Первые запуски: сначала CPU](#64-первые-запуски-сначала-cpu)
+  - [Группа B: GGUF через llama.cpp](#группа-b-gguf-через-llamacpp)
+    - [Запуск сервера: выбрать ОДНУ команду](#запуск-сервера-выбрать-одну-команду)
+      - [Index](#index)
+      - [Tencent](#tencent)
+    - [Единый клиент с модельно-зависимыми шаблонами](#единый-клиент-с-модельно-зависимыми-шаблонами)
+    - [Первые запросы](#первые-запросы)
+    - [Отдельный сценарий Chimera](#отдельный-сценарий-chimera)
+  - [Альтернатива: Ollama](#альтернатива-ollama)
+    - [GGUF из HF](#gguf-из-hf)
+    - [TranslateGemma в каталоге Ollama](#translategemma-в-каталоге-ollama)
+    - [Если модель уже скачана как локальный GGUF](#если-модель-уже-скачана-как-локальный-gguf)
+  - [Группа C: encoder-decoder — отдельное исключение](#группа-c-encoder-decoder--отдельное-исключение)
+    - [Область применения и текущий статус](#область-применения-и-текущий-статус)
+    - [MADLAD: пауза испытаний](#madlad-пауза-испытаний)
+    - [Отдельное окружение](#отдельное-окружение)
+    - [Скрипт для OPUS и M2M100](#скрипт-для-opus-и-m2m100)
+    - [Первые запуски: сначала CPU](#первые-запуски-сначала-cpu)
+    - [Проверка результата перед переходом на MPS](#проверка-результата-перед-переходом-на-mps)
+    - [Проверка на MPS](#проверка-на-mps)
+    - [Правила для coding-агента](#правила-для-coding-агента)
   - [7. Проверка, фиксация версий и локальность](#7-проверка-фиксация-версий-и-локальность)
     - [7.1. Минимальные критерии успешного запуска](#71-минимальные-критерии-успешного-запуска)
     - [7.2. Сохранить фактическую среду](#72-сохранить-фактическую-среду)
@@ -340,6 +346,7 @@ script -q -a logs/tg12.log /usr/bin/time -l python -u scripts/translate_mlx.py \
   --model mlx-community/translategemma-12b-it-8bit \
   --input data/source.en.txt --output results/tg12.ru.txt
 ```
+
 ```bash
 script -q -a logs/tg27.log /usr/bin/time -l python -u scripts/translate_mlx.py \
   --model mlx-community/translategemma-27b-it-4bit \
@@ -376,69 +383,80 @@ hf auth login --force
 
 Эти `MLX LM` рецепты — только text→text. Наличие у исходной TranslateGemma image-input не доказывает наличие vision-компонентов в конкретной MLX LM конверсии. Обработку PDF, OCR и сохранение вёрстки здесь не проверяем.
 
-## 4. Группа B: GGUF через llama.cpp
+## Группа B: GGUF через llama.cpp
 
-### 4.1. Запуск сервера: выбрать ОДНУ команду
+### Запуск сервера: выбрать ОДНУ команду
 
-Команды загружают выбранный квант, а не весь набор квантов. Сервер занимает терминал; запрос выполняется из второго терминала. `--no-mmproj` отключает автоматическую загрузку vision-projector: этот стенд проверяет только текстовый перевод. [web:197] Везде слушаем только loopback, порт 8080. При смене модели остановить сервер через Ctrl+C.
+Краткая аннотация:
+  - команды загружают выбранный квант, а не весь набор квантов,
+  - запуск `llama-server` выполняется в первом терминале,
+  - запрос выполняется из второго терминала, 
+  - `--no-mmproj` отключает автоматическую загрузку vision-projector – стенд проверяет только текстовый перевод,
+  - везде слушаем только loopback, порт 8080,
+  - при смене модели необходимо остановить сервер через Ctrl+C.
+
+#### Index
+
+Официальные карточки Index приводят эти GGUF-репозитории, запуск llama.cpp, greedy decoding и `enable_thinking:false`. Для каждой из двух моделей указаны консервативные настройки и значения контекста и параллелизма.
 
 Index 2B:
 
 ```bash
-llama-server -hf IndexTeam/Index-Translate-2B-GGUF:Q4_K_M \
+script -q logs/index2-server.log llama-server -hf IndexTeam/Index-Translate-2B-GGUF:Q4_K_M \
   -ngl 99 --no-mmproj -c 4096 --parallel 1 --host 127.0.0.1 --port 8080 \
-  --alias index2 --jinja --chat-template-kwargs '{"enable_thinking":false}' \
-  2> logs/index2-server.log
+  --alias index2 --jinja --chat-template-kwargs '{"enable_thinking":false}'
 ```
 
 Index 9B:
 
 ```bash
-llama-server -hf IndexTeam/Index-Translate-9B-GGUF:Q4_K_M \
+script -q logs/index9-server.log llama-server -hf IndexTeam/Index-Translate-9B-GGUF:Q4_K_M \
   -ngl 99 --no-mmproj -c 4096 --parallel 1 --host 127.0.0.1 --port 8080 \
-  --alias index9 --jinja --chat-template-kwargs '{"enable_thinking":false}' \
-  2> logs/index9-server.log
+  --alias index9 --jinja --chat-template-kwargs '{"enable_thinking":false}'
 ```
 
-Официальные карточки Index приводят эти GGUF-репозитории, запуск llama.cpp, greedy decoding и `enable_thinking:false`. Значения контекста и параллелизма выше — консервативные настройки этого стенда. [web:66][web:7]
+#### Tencent
+
+Сторонние GGUF-конверсии соответствующих Tencent-моделей. Их наличие подтверждено. Фактическое качество кванта и работа данной сборки llama.cpp на M5 необходимо проверить. 
 
 Hunyuan MT:
 
 ```bash
-llama-server -hf olegshulyakov/Hunyuan-MT-7B-GGUF:Q6_K \
-  -ngl 99 --no-mmproj -c 4096 --parallel 1 --host 127.0.0.1 --port 8080 \
-  --alias hunyuan 2> logs/hunyuan-server.log
+hf download mradermacher/Hunyuan-MT-7B-GGUF \
+  Hunyuan-MT-7B.Q6_K.gguf --local-dir models/hunyuan && \
+script -q logs/hunyuan-server.log llama-server -m models/hunyuan/Hunyuan-MT-7B.Q6_K.gguf \
+  -ngl 99 --no-mmproj -c 4096 --parallel 1 --host 127.0.0.1 --port 8080 --cors-origins localhost \
+  --alias hunyuan
 ```
 
 Chimera:
 
 ```bash
-llama-server -hf DevQuasar/tencent.Hunyuan-MT-Chimera-7B-GGUF:Q4_K_M \
+script -q logs/chimera-server.log llama-server -hf DevQuasar/tencent.Hunyuan-MT-Chimera-7B-GGUF:Q4_K_M \
   -ngl 99 --no-mmproj -c 8192 --parallel 1 --host 127.0.0.1 --port 8080 \
-  --alias chimera 2> logs/chimera-server.log
+  --alias chimera
 ```
 
-Это сторонние GGUF-конверсии соответствующих Tencent-моделей. Их наличие подтверждено; фактическое качество кванта и работа данной сборки llama.cpp на M5 не проверены. [web:167][web:132]
 
 Tower:
 
 ```bash
-llama-server -hf mradermacher/TowerInstruct-7B-v0.2-GGUF:Q4_K_M \
+script -q logs/tower-server.log llama-server -hf mradermacher/TowerInstruct-7B-v0.2-GGUF:Q4_K_M \
   -ngl 99 --no-mmproj -c 2048 --parallel 1 --host 127.0.0.1 --port 8080 \
-  --alias tower 2> logs/tower-server.log
+  --alias tower
 ```
 
-Квант опубликован; в оригинальной карточке Tower обучение ограничено `max_seq_length:2048`, используется ChatML. Потому первый тест ограничен 2048, независимо от того, какое большее окно может разрешить конфигурация. В карточке одновременно отмечено улучшение document-level поведения и сохранено предупреждение против использования как готового document-level переводчика: целые стандарты этим не считаются проверенными. [web:169][web:49]
+Квант опубликован; в оригинальной карточке Tower обучение ограничено `max_seq_length:2048`, используется ChatML. Потому первый тест ограничен 2048, независимо от того, какое большее окно может разрешить конфигурация. В карточке одновременно отмечено улучшение document-level поведения и сохранено предупреждение против использования как готового document-level переводчика: целые стандарты этим не считаются проверенными.
 
 Qwen:
 
 ```bash
-llama-server -hf unsloth/Qwen3-30B-A3B-Instruct-2507-GGUF:Q4_K_M \
+script -q logs/qwen-server.log llama-server -hf unsloth/Qwen3-30B-A3B-Instruct-2507-GGUF:Q4_K_M \
   -ngl 99 --no-mmproj -c 4096 --parallel 1 --host 127.0.0.1 --port 8080 \
-  --alias qwen2507 2> logs/qwen-server.log
+  --alias qwen2507
 ```
 
-В выбранном репозитории есть ровно этот Q4_K_M; исходная модель — non-thinking Instruct-2507. Это универсальная instruct-модель, а не специализированная MT-модель; назначение её переводчиком/верификатором остаётся гипотезой. [web:193][web:75]
+В выбранном репозитории есть ровно этот Q4_K_M; исходная модель — non-thinking Instruct-2507. Это универсальная instruct-модель, а не специализированная MT-модель. В качестве переводчика работает, в качестве верификатора требуется проверить.
 
 Проверить готовность:
 
@@ -447,13 +465,11 @@ curl --fail-with-body http://127.0.0.1:8080/health
 curl --fail-with-body http://127.0.0.1:8080/v1/models
 ```
 
-Если не существует `llama-server`, посмотреть `command -v llama` и `llama --help`. Новая оболочка некоторых сборок использует `llama serve`; не подменять синтаксис вслепую. Использование отдельных `llama-server` и `llama-cli` также показано в карточках конверсий. [web:66][web:132]
+### Единый клиент с модельно-зависимыми шаблонами
 
-### 4.2. Единый клиент с модельно-зависимыми шаблонами
+Чтобы не полагаться на автоматически выбранный `chat template` стороннего GGUF, клиент ниже берёт токенизатор исходной модели и передаёт готовые token IDs в нативный `/completion` llama.cpp. Шаблон применяется ровно один раз. Нативный API и параметры сервера описаны в документации llama.cpp.
 
-Чтобы не полагаться на автоматически выбранный chat template стороннего GGUF, клиент ниже берёт токенизатор исходной модели и передаёт готовые token IDs в нативный `/completion` llama.cpp. Шаблон применяется ровно один раз. Нативный API и параметры сервера описаны в документации llama.cpp. [web:197]
-
-Исходный токенизатор должен соответствовать именно выбранному GGUF; проверка соответствия — обязательная часть первого испытания. Не использовать этот клиент с произвольным другим файлом модели.
+Исходный токенизатор должен соответствовать именно выбранному GGUF. Проверка соответствия — обязательная часть первого испытания. Не использовать этот клиент с произвольным другим файлом модели.
 
 Создать `scripts/translate_gguf.py`:
 
@@ -551,13 +567,19 @@ if result.get('stopped_limit') or result.get('tokens_predicted', 0) >= limit:
 print(answer)
 ```
 
-Форматы запросов: Index — официальный краткий шаблон; Hunyuan и Chimera — шаблоны Tencent, включая `add_generation_prompt=False`; Tower — карточка Unbabel. Для Qwen сформулирован тестовый переводческий запрос. Sampling Hunyuan взят из карточки Tencent. Для остальных выбран temperature=0 как стартовый режим сравнения; это не универсальная рекомендация авторов Qwen, которые приводят temperature=0.7. [web:7][web:33][web:49][web:75]
+Форматы запросов: 
+  - Index — официальный краткий шаблон,
+  - Hunyuan и Chimera — шаблоны Tencent, включая `add_generation_prompt=False`,
+  - Tower — карточка Unbabel,
+  - для Qwen сформулирован тестовый переводческий запрос. 
+  
+Sampling Hunyuan взят из карточки Tencent. Для остальных выбран `temperature=0` как стартовый режим сравнения – это не универсальная рекомендация авторов Qwen, которые приводят `temperature=0.7`.
 
 Перед первым запуском установить профиль в соответствие серверу. Клиент проверяет alias сервера, но alias — имя, заданное оператором, а не криптографическая проверка весов. В частности, нельзя запустить сервер Index 2B и отправить токены Index 9B. Идентификатор alias из `/v1/models`, команда запуска, лог архитектуры и ID токенизатора должны согласоваться. При расхождении остановиться.
 
-### 4.3. Первые запросы
+### Первые запросы
 
-Во втором терминале:
+Во втором терминале для каждой из моделей выполнить проверку:
 
 ```bash
 cd "$HOME/translation-lab"
@@ -583,15 +605,16 @@ python scripts/translate_gguf.py --profile qwen2507 \
   --input data/source.en.txt --output results/qwen2507.ru.txt
 ```
 
-Это НЕ последовательность для выполнения против одного неизменного сервера: каждому вызову нужен свой профиль весов.
+> [!Note]
+> 
+> Для каждого профиля весов проверка срабатывает успешно.
 
-### 4.4. Отдельный сценарий Chimera
+### Отдельный сценарий Chimera
 
-Назначение Chimera — объединять несколько переводов. В официальном примере шесть кандидатов; это не доказательство, что любое другое число невозможно, но для первого воспроизводимого теста оставляем шесть. Увеличение качества не гарантируется. [web:33]
+Назначение Chimera — объединять несколько переводов. В официальном примере шесть кандидатов; это не доказательство, что любое другое число невозможно, но для первого воспроизводимого теста оставляем шесть. Увеличение качества не гарантируется.
 
-1. Запустить Hunyuan MT сервер из §4.1.
+1. Запустить Hunyuan MT сервер.
 2. Выполнить шесть запросов с разными seed:
-
 ```bash
 (
 set -e
@@ -616,9 +639,10 @@ PY
 )
 ```
 
-Проверить отсутствие ошибок и обрезаний во всех шести JSON-ответах; подоболочка останавливается при ошибке, а кандидаты каждого прогона создаются в новом каталоге. При ошибке не выполнять следующий шаг с прежним `data/candidates.ru.json`. Разные seed не гарантируют разные тексты. Не создавать видимость ансамбля простым копированием одного перевода шесть раз.
+> [!Note]
+> Выполнена проверка на отсутствие ошибок и обрезаний во всех шести JSON-ответах; подоболочка останавливается при ошибке, а кандидаты каждого прогона создаются в новом каталоге.
 
-3. Остановить Hunyuan сервер; запустить Chimera сервер из §4.1.
+3. Остановить Hunyuan сервер; запустить Chimera сервер.
 4. Выполнить:
 
 ```bash
@@ -629,9 +653,9 @@ python scripts/translate_gguf.py --profile chimera \
 
 Получается шесть генераций кандидатов плюс одна генерация объединения. Сравнивать итог нужно с лучшим кандидатом, учитывая суммарную задержку. Последовательный запуск не требует держать обе модели в памяти одновременно.
 
-## 5. Альтернатива: Ollama
+## Альтернатива: Ollama
 
-### 5.1. GGUF из HF
+### GGUF из HF
 
 При запущенном локальном Ollama-сервере можно выбрать один артефакт:
 
@@ -640,7 +664,7 @@ ollama pull hf.co/IndexTeam/Index-Translate-2B-GGUF:Q4_K_M
 ollama run hf.co/IndexTeam/Index-Translate-2B-GGUF:Q4_K_M
 ```
 
-Остальные GGUF-идентификаторы из §4 использовать аналогично только после проверки поддержки архитектуры установленной версией Ollama. Для Index и Hunyuan соответствующие HF/Ollama-команды документированы; это не заменяет проверку шаблона. [web:66][web:7][web:167][web:132]
+Остальные GGUF-идентификаторы использовать аналогично только после проверки поддержки архитектуры установленной версией Ollama. Для Index и Hunyuan соответствующие HF/Ollama-команды документированы; это не заменяет проверку шаблона. 
 
 Для автоматизации важнее API, чем интерактивный чат. Ниже пример для Index; после ответа сохранить полный JSON и проверить отсутствие thinking/служебного вывода:
 
@@ -658,20 +682,21 @@ curl --fail-with-body http://127.0.0.1:11434/api/chat \
 ollama ps
 ```
 
-Если `think:false` не поддерживается для этой архитектуры/версии или даёт неверный шаблон, не удалять флаг молча: вернуться к llama.cpp-рецепту с явным `enable_thinking:false`. Ollama-путь для Index считать принятым только после проверки. Основной путь §4 намеренно не зависит от такого преобразования шаблона.
+Ollama-путь для Index нужно считать принятым.
 
-В API Ollama `keep_alive:0` выгружает модель после запроса; `num_ctx` задаёт контекст; `ollama ps` показывает размещение модели. [web:195]
+В API Ollama `keep_alive:0` выгружает модель после запроса; `num_ctx` задаёт контекст; `ollama ps` показывает размещение модели. 
 
-### 5.2. TranslateGemma в каталоге Ollama
+### TranslateGemma в каталоге Ollama
 
+Выполнять при включённом `vpn`, иначе ошибка `TLS handshake timeout`:
 ```bash
 ollama pull translategemma:4b
 ollama show translategemma:4b
 ```
 
-В семействе есть `4b`, `12b`, `27b`. Эти теги не фиксируют исходные пользовательские MLX 4-bit/8-bit артефакты; перед сравнением проверить quantization и digest. На странице Ollama ориентиры файлов: 4b — 3.3 GB, 12b — 8.1 GB, 27b — 17 GB. [web:70]
+В семействе есть `4b`, `12b`, `27b`. Эти теги не фиксируют исходные пользовательские MLX 4-bit/8-bit артефакты; перед сравнением проверить quantization и digest. На странице Ollama ориентиры файлов: 4b — 3.3 GB, 12b — 8.1 GB, 27b — 17 GB.
 
-Запрос по опубликованному Ollama Prompt Guide:
+Запрос по опубликованному Ollama Prompt Guide для `4b` выполняется успешно:
 
 ```bash
 curl --fail-with-body http://127.0.0.1:11434/api/chat \
@@ -684,119 +709,433 @@ curl --fail-with-body http://127.0.0.1:11434/api/chat \
     "options":{"temperature":0,"num_ctx":2048,"num_predict":768}
   }' > results/ollama-tg4.json
 ```
+```json
+{
+  "model":"translategemma:4b",
+  "created_at":"2026-11-22T16:50:08.093981Z",
+  "message":{
+    "role":"assistant",
+    "content":"UE должен хранить идентификатор сессии в течение 30 секунд."
+  },
+  "done":true,
+  "done_reason":"stop",
+  "total_duration":1087323250,
+  "load_duration":843183292,
+  "prompt_eval_count":89,
+  "prompt_eval_cached_count":0,
+  "prompt_eval_duration":68583000,
+  "eval_count":16,
+  "eval_duration":172760000
+}
+```
 
-Для 12b/27b заменить только тег после отдельной загрузки и проверки модели. Формат выше специфичен для Ollama-упаковки. В MLX использовать структурированное сообщение из §3, а не добавлять этот текст второй раз поверх официального шаблона. [web:70][web:13]
+### Если модель уже скачана как локальный GGUF
 
-### 5.3. Если модель уже скачана как локальный GGUF
-
-Можно создать локальный Modelfile с `FROM /absolute/path/model.gguf`, затем `ollama create`. Но архитектура и шаблон всё равно должны поддерживаться. Не импортировать MLX-квантизованные safetensors как будто это эквивалентный GGUF: формат, схема квантования и поддержка runtime различаются. Официальный путь импорта GGUF описан Ollama. [web:73]
+Можно создать локальный Modelfile с `FROM /absolute/path/model.gguf`, затем `ollama create`. Но архитектура и шаблон всё равно должны поддерживаться. Не импортировать MLX-квантизованные safetensors как будто это эквивалентный GGUF: формат, схема квантования и поддержка runtime различаются. Официальный путь импорта GGUF описан Ollama.
 
 Этот способ не является обязательным шагом инструкции: импорт и отдельные кэши могут занимать дополнительный SSD. Не скачивать одну модель во всех трёх форматах без задачи сравнения.
 
-## 6. Группа C: encoder-decoder — отдельное исключение
+## Группа C: encoder-decoder — отдельное исключение
 
-### 6.1. Почему это исключение
+### Область применения и текущий статус
 
-MADLAD использует T5, OPUS — Marian, M2M100 — свою encoder-decoder архитектуру. Их интерфейс — подготовка входа и seq2seq `generate`, а не сообщения chat LLM. В карточке MADLAD квантованный GGUF показан для Candle; расширение файла само по себе не гарантирует поддержку конкретным движком. Здесь не утверждается вечное отсутствие любой поддержки T5 в llama.cpp: не подтверждён именно готовый проверенный рецепт для выбранного MADLAD-чекпойнта. [web:67][web:69][web:68]
+Этот раздел описывает дополнительный путь через Transformers/PyTorch,
+не входящий в основной набор runtime: MLX, llama.cpp и Ollama.
 
-Если допустимы только MLX, llama.cpp и Ollama, на этом месте остановиться и отметить эти три модели как `blocked: runtime outside approved set`. Следующие шаги — явный дополнительный вариант, а не скрытая замена требований.
+OPUS использует Marian, M2M100 — свою encoder-decoder архитектуру.
+Их интерфейс — подготовка входа и seq2seq `generate`, а не сообщения chat LLM.
 
-### 6.2. Отдельное окружение
+MADLAD400-3B использует T5, но его испытания поставлены на паузу.
+Модель не входит в активную последовательность запуска этого раздела.
+
+> [!NOTE]
+> Если допустимы только MLX, llama.cpp и Ollama, остановиться здесь.
+> Для OPUS и M2M100 отметить
+> `blocked: runtime outside approved set`.
+> Для MADLAD сохранить статус `paused`.
+>
+> Следующие шаги требуют отдельного согласования Transformers/PyTorch.
+> Наличие инструкции не означает согласование дополнительного runtime.
+
+Результаты испытаний на 2026-11-22:
+
+| Модель | Статус | Наблюдение |
+|---|---|---|
+| OPUS-MT EN→RU | Проверка результата не завершена | В изученном MPS-логе нет сообщений об ошибках. Полнота и смысл перевода отдельно не подтверждены |
+| M2M100-418M | Проверка полноты не пройдена | На CPU и MPS пропущено первое предложение тестового исходника — требование о сохранении идентификатора сессии на 30 секунд |
+| MADLAD400-3B | `paused` | На CPU и MPS получены английские повторы вместо русского перевода; генерация достигает лимита без EOS |
+
+Успешное выполнение процесса не означает успешного перевода.
+Наличие выходного файла также не является достаточным критерием.
+
+### MADLAD: пауза испытаний
+
+Объект паузы: `google/madlad400-3b-mt` в текущем локальном
+Transformers/PyTorch-рецепте.
+
+Основания:
+
+- На CPU и MPS получена некорректная генерация:
+  английский текст вместо русского перевода, повторы, пропуски и искажение смысла.
+- Генерация достигала лимита 512 новых токенов без EOS.
+- Fast- и Slow-токенизаторы на тестовом исходнике дали одинаковые ID;
+  исходный текст и префикс `<2ru>` сохранялись.
+- В испытании с отключённым кэшем наблюдаемый результат не улучшился.
+- Корректно выполненный CPU-прогон с `eager` attention также не исправил результат.
+- Первопричина не установлена. Не доказаны ни дефект самой модели,
+  ни повреждение весов, ни конкретная несовместимость библиотек.
+
+Промежуточный диагностический запуск, в котором MADLAD ошибочно
+загружался через `M2M100ForConditionalGeneration`, не является
+валидным испытанием MADLAD или `eager` attention.
+
+Зафиксированное окружение:
+
+| Компонент | Версия |
+|---|---|
+| Python | 3.12.16 |
+| torch | 2.15.0 |
+| transformers | 4.57.6 |
+| tokenizers | 0.22.2 |
+| sentencepiece | 0.2.3 |
+| huggingface-hub | 0.36.2 |
+| safetensors | 0.8.0 |
+
+Эти версии описывают исследованное окружение, а не рекомендуемый
+или подтверждённо совместимый lockfile.
+
+Правила на время паузы:
+
+- Не запускать MADLAD в рамках штатного smoke-test.
+- Не включать полученные результаты в сравнение качества или скорости
+  как валидные переводы.
+- Не продолжать подбор параметров и переустановку зависимостей
+  без отдельной задачи владельца проекта.
+- Сохранить имеющиеся логи, результаты и диагностические скрипты.
+- Не удалять веса и окружение без отдельного решения.
+
+Возобновление — только по отдельному решению владельца проекта.
+Первая задача при возобновлении: минимальный воспроизводимый пример
+с фиксацией revision модели, зависимостей, сведений загрузки весов
+и полного результата генерации.
+
+### Отдельное окружение
+
+Для нового окружения:
 
 ```bash
 cd "$HOME/translation-lab"
 source env/local.sh
-"$(brew --prefix python@3.12)/bin/python3.12" -m venv .venv-seq2seq
+
+"$(brew --prefix python@3.12)/bin/python3.12" \
+  -m venv .venv-seq2seq
+
 source .venv-seq2seq/bin/activate
+
 python -m pip install --upgrade pip
-python -m pip install 'torch>=2.6' 'transformers>=4.56,<5' \
-  sentencepiece sacremoses huggingface_hub
-python -c 'import torch; print(torch.__version__); print("MPS:", torch.backends.mps.is_available())'
+python -m pip install \
+  'torch>=2.6' \
+  'transformers>=4.56,<5' \
+  sentencepiece sacremoses huggingface_hub protobuf
+
+python -m pip check
+
+python -c \
+  'import torch; print(torch.__version__); print("MPS:", torch.backends.mps.is_available())'
 ```
 
-Диапазон Transformers выбран как стартовая совместимая ветка для старых seq2seq-моделей, а не как испытанный lockfile. После успешного прогона зафиксировать точные версии. Здесь используются классы напрямую, не устаревающий `pipeline("translation")`. Apple документирует PyTorch/MPS для Mac; работоспособность каждой операции конкретной модели на MPS всё равно проверяется отдельно. [web:196][web:67][web:68][web:69]
+Если окружение уже существует, для обычного запуска достаточно:
 
-### 6.3. Скрипт для трёх моделей
+```bash
+cd "$HOME/translation-lab"
+source env/local.sh
+source .venv-seq2seq/bin/activate
+```
 
-Создать `scripts/translate_seq2seq.py`:
+Не переустанавливать зависимости существующего окружения
+только ради повторного прогона.
+
+Указанные диапазоны — стартовая конфигурация, не испытанный lockfile.
+Точные версии фиксируются после проверки работоспособности и результата.
+
+### Скрипт для OPUS и M2M100
+
+Путь: `scripts/translate_seq2seq.py`.
+
+Назначение: короткий EN→RU smoke-test через Transformers/PyTorch.
+MADLAD намеренно отсутствует в допустимых профилях.
+
+При замене существующего скрипта сохранить диагностические материалы
+предыдущих испытаний.
 
 ```python
 import argparse
 import time
 from pathlib import Path
+
 import torch
 from transformers import (
-    AutoTokenizer, AutoModelForSeq2SeqLM,
-    MarianTokenizer, MarianMTModel,
-    M2M100Tokenizer, M2M100ForConditionalGeneration,
+    MarianMTModel,
+    MarianTokenizer,
+    M2M100ForConditionalGeneration,
+    M2M100Tokenizer,
 )
 
-p = argparse.ArgumentParser()
-p.add_argument('--profile', choices=['madlad', 'opus', 'm2m100'], required=True)
-p.add_argument('--input', required=True)
-p.add_argument('--output', required=True)
-p.add_argument('--device', choices=['cpu', 'mps'], default='cpu')
-a = p.parse_args()
-if a.device == 'mps' and not torch.backends.mps.is_available():
-    raise SystemExit('MPS requested but not available; no silent fallback')
-text = Path(a.input).read_text(encoding='utf-8').strip()
-if not text:
-    raise SystemExit('Empty input')
-t0 = time.perf_counter()
-if a.profile == 'madlad':
-    model_id = 'google/madlad400-3b-mt'
-    tokenizer = AutoTokenizer.from_pretrained(model_id)
-    model = AutoModelForSeq2SeqLM.from_pretrained(model_id)
-    text = '<2ru> ' + text
-elif a.profile == 'opus':
-    model_id = 'Helsinki-NLP/opus-mt-en-ru'
-    tokenizer = MarianTokenizer.from_pretrained(model_id)
-    model = MarianMTModel.from_pretrained(model_id)
-else:
-    model_id = 'facebook/m2m100_418M'
-    tokenizer = M2M100Tokenizer.from_pretrained(model_id)
-    tokenizer.src_lang = 'en'
-    model = M2M100ForConditionalGeneration.from_pretrained(model_id)
-inputs = tokenizer(text, return_tensors='pt', truncation=False)
-if inputs['input_ids'].shape[-1] > 512:
-    raise SystemExit('Smoke-test policy: input >512 tokens; split without truncation')
-model = model.to(device=a.device, dtype=torch.float32).eval()
-inputs = {key: value.to(a.device) for key, value in inputs.items()}
-kwargs = {'max_new_tokens': 512, 'do_sample': False, 'num_beams': 1}
-if a.profile == 'm2m100':
-    kwargs['forced_bos_token_id'] = tokenizer.get_lang_id('ru')
-with torch.inference_mode():
-    output = model.generate(**inputs, **kwargs)
-answer = tokenizer.decode(output[0], skip_special_tokens=True)
-if not answer.strip():
-    raise SystemExit('Empty generation')
-Path(a.output).write_text(answer + '\n', encoding='utf-8')
-if output.shape[-1] >= 512 and int(output[0, -1]) != tokenizer.eos_token_id:
-    raise SystemExit('Potential output truncation; inspect saved output')
-print({'model': model_id, 'device': a.device,
-       'total_s_including_load': time.perf_counter()-t0})
+
+def main():
+    parser = argparse.ArgumentParser()
+    parser.add_argument(
+        "--profile",
+        choices=["opus", "m2m100"],
+        required=True,
+    )
+    parser.add_argument("--input", required=True)
+    parser.add_argument("--output", required=True)
+    parser.add_argument(
+        "--device",
+        choices=["cpu", "mps"],
+        default="cpu",
+    )
+    args = parser.parse_args()
+
+    if args.device == "mps" and not torch.backends.mps.is_available():
+        raise SystemExit(
+            "MPS requested but not available; no silent fallback"
+        )
+
+    text = Path(args.input).read_text(encoding="utf-8").strip()
+    if not text:
+        raise SystemExit("Empty input")
+
+    started = time.perf_counter()
+
+    if args.profile == "opus":
+        model_id = "Helsinki-NLP/opus-mt-en-ru"
+        tokenizer = MarianTokenizer.from_pretrained(model_id)
+        model = MarianMTModel.from_pretrained(model_id)
+    else:
+        model_id = "facebook/m2m100_418M"
+        tokenizer = M2M100Tokenizer.from_pretrained(model_id)
+        tokenizer.src_lang = "en"
+        model = M2M100ForConditionalGeneration.from_pretrained(
+            model_id
+        )
+
+    inputs = tokenizer(
+        text,
+        return_tensors="pt",
+        truncation=False,
+    )
+    input_tokens = inputs["input_ids"].shape[-1]
+
+    if input_tokens > 512:
+        raise SystemExit(
+            "Smoke-test policy: input >512 tokens; "
+            "split without truncation"
+        )
+
+    model = model.to(
+        device=args.device,
+        dtype=torch.float32,
+    ).eval()
+
+    inputs = {
+        key: value.to(args.device)
+        for key, value in inputs.items()
+    }
+
+    max_new_tokens = 512
+    generation_kwargs = {
+        "max_new_tokens": max_new_tokens,
+        "do_sample": False,
+        "num_beams": 1,
+    }
+
+    if args.profile == "m2m100":
+        generation_kwargs["forced_bos_token_id"] = (
+            tokenizer.get_lang_id("ru")
+        )
+
+    print(
+        {
+            "model": model_id,
+            "model_class": type(model).__name__,
+            "model_device": str(next(model.parameters()).device),
+            "model_dtype": str(next(model.parameters()).dtype),
+            "attention": getattr(
+                model.config, "_attn_implementation", None
+            ),
+            "input_tokens": input_tokens,
+            "generation_kwargs": generation_kwargs,
+        },
+        flush=True,
+    )
+
+    with torch.inference_mode():
+        output = model.generate(
+            **inputs,
+            **generation_kwargs,
+        )
+
+    answer = tokenizer.decode(
+        output,
+        skip_special_tokens=True,
+    )
+    if not answer.strip():
+        raise SystemExit("Empty generation")
+
+    output_path = Path(args.output)
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    output_path.write_text(answer + "\n", encoding="utf-8")
+
+    last_token_id = int(output[0, -1])
+
+    print(
+        {
+            "output_tokens_including_decoder_start": output.shape[-1],
+            "last_token_id": last_token_id,
+            "tokenizer_eos_token_id": tokenizer.eos_token_id,
+            "output_file": str(output_path),
+            "total_s_including_load": time.perf_counter() - started,
+        },
+        flush=True,
+    )
+
+    if (
+        output.shape[-1] >= max_new_tokens
+        and last_token_id != tokenizer.eos_token_id
+    ):
+        raise SystemExit(
+            "Potential output truncation; inspect saved output"
+        )
+
+
+if __name__ == "__main__":
+    main()
 ```
 
-У MADLAD префикс `<2ru>` задаёт целевой язык. OPUS en-ru не требует отдельного чат-промпта или языкового префикса. У M2M100 задаются исходный язык и целевой BOS. Лимит 512 входных токенов здесь — политика короткого smoke-test, не заявление о едином максимуме трёх архитектур. [web:67][web:69][web:68]
+Особенности:
 
-### 6.4. Первые запуски: сначала CPU
+- OPUS EN→RU не требует чат-промпта или языкового префикса.
+- Для M2M100 задаются исходный язык `en` и целевой BOS для `ru`.
+- Параметры генерации сохранены относительно исходного smoke-test:
+  `max_new_tokens=512`, `do_sample=False`, `num_beams=1`.
+- Известное предупреждение M2M100 об `early_stopping` не устранено
+  изменением режима генерации: это отдельная диагностическая задача.
+
+> [!TIP]
+> Лимит 512 входных токенов — политика короткого smoke-test,
+> а не заявление о максимальном контексте обеих архитектур.
+
+### Первые запуски: сначала CPU
+
+Следующие команды нужны для нового прогона или проверки после изменений,
+а не для автоматического повторения уже выполненных испытаний.
 
 ```bash
 source .venv-seq2seq/bin/activate
-/usr/bin/time -l python scripts/translate_seq2seq.py --profile opus \
-  --input data/source.en.txt --output results/opus.cpu.ru.txt \
-  --device cpu 2> logs/opus.cpu.log
+mkdir -p logs results
 
-/usr/bin/time -l python scripts/translate_seq2seq.py --profile m2m100 \
-  --input data/source.en.txt --output results/m2m100.cpu.ru.txt \
-  --device cpu 2> logs/m2m100.cpu.log
-
-/usr/bin/time -l python scripts/translate_seq2seq.py --profile madlad \
-  --input data/source.en.txt --output results/madlad.cpu.ru.txt \
-  --device cpu 2> logs/madlad.cpu.log
+python -m py_compile scripts/translate_seq2seq.py
 ```
 
-CPU — совместимый контрольный путь, не обещание приемлемой скорости. После успешного CPU-прогона повторить нужную команду с `--device mps` и отдельным именем результата. При ошибке MPS зафиксировать её; не включать незаметный CPU fallback в том же замере. FP32 выбран для минимизации начальных проблем точности/совместимости, а не как оптимальный производственный режим.
+При ошибке синтаксической проверки остановиться.
+
+```bash
+for profile in opus m2m100; do
+  /usr/bin/time -l python -u scripts/translate_seq2seq.py \
+    --profile "$profile" \
+    --input data/source.en.txt \
+    --output "results/$profile.cpu.ru.txt" \
+    --device cpu \
+    > "logs/$profile.cpu.stdout.log" \
+    2> "logs/$profile.cpu.log"
+
+  rc=$?
+  printf '\nexit_code=%s\n' "$rc" \
+    >> "logs/$profile.cpu.log"
+done
+```
+
+Команды перезаписывают одноимённые результаты и логи.
+Перед повторным запуском сохранить материалы, нужные для сравнения.
+
+CPU — контрольный путь, не обещание приемлемой скорости.
+
+### Проверка результата перед переходом на MPS
+
+Для исходника `data/source.en.txt`:
+
+```text
+The UE shall retain the session identifier for 30 seconds.
+If the request is rejected, the server MUST NOT modify the configuration.
+See RFC 2119 and 3GPP TS 23.501, clause 5.6.
+```
+
+Проверить:
+
+1. Процесс завершился с `exit_code=0`.
+2. Перевод существует и не пуст.
+3. Передано требование о сохранении идентификатора сессии на 30 секунд.
+4. При отклонении запроса именно сервер не должен менять конфигурацию.
+5. Сохранены `RFC 2119`, `3GPP TS 23.501` и пункт `5.6`.
+6. Нет повторов, обрыва текста и непереведённых предложений,
+   кроме сохраняемых идентификаторов и обозначений.
+
+Пункт 1 необходим, но недостаточен.
+
+M2M100 в текущих испытаниях не прошёл пункт 3.
+До устранения или отдельного решения владельца его результат
+не считается принятым переводом.
+
+### Проверка на MPS
+
+Выполнять для профиля, прошедшего CPU-проверку, либо как отдельный
+диагностический эксперимент с явной фиксацией этого статуса.
+
+Пример для OPUS, только после проверки CPU-перевода:
+
+```bash
+source .venv-seq2seq/bin/activate
+mkdir -p logs results
+
+/usr/bin/time -l python -u scripts/translate_seq2seq.py \
+  --profile opus \
+  --input data/source.en.txt \
+  --output results/opus.mps.ru.txt \
+  --device mps \
+  > logs/opus.mps.stdout.log \
+  2> logs/opus.mps.log
+
+rc=$?
+printf '\nexit_code=%s\n' "$rc" >> logs/opus.mps.log
+```
+
+Для M2M100 аналогичный прогон выполняется только при соблюдении
+условий выше, с заменой профиля и имён файлов.
+
+При ошибке MPS сохранить журнал. Не включать незаметный переход
+на CPU в рамках того же замера.
+
+Скрипт явно переносит модель и входы на выбранное устройство.
+Это не является доказательством исполнения каждой операции на GPU:
+fallback отдельных операций отдельно не протоколируется.
+
+FP32 — исходная конфигурация проверки, не утверждение
+об оптимальном производственном режиме.
+
+### Правила для coding-агента
+
+- Активные профили этого раздела: `opus`, `m2m100`.
+- Не возвращать `madlad` в рабочий скрипт и команды
+  без отдельной задачи владельца.
+- Не интерпретировать паузу MADLAD как доказательство
+  непригодности модели во всех окружениях.
+- Не менять зависимости и параметры генерации одновременно
+  с исправлением документации.
+- Сохранять отдельные логи и результаты каждого эксперимента.
+- Не считать код завершения `0` автоматической приёмкой перевода.
+- Не удалять ранее собранные диагностические материалы.
 
 ## 7. Проверка, фиксация версий и локальность
 
